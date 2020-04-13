@@ -14,8 +14,9 @@ import async_timeout
 import voluptuous as vol
 
 import homeassistant.helpers.config_validation as cv
+from homeassistant.const import STATE_ON
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.helpers.entity import Entity
+from homeassistant.components.binary_sensor import BinarySensorDevice
 from homeassistant.const import (
     CONF_HOST, CONF_NAME, CONF_UNIT_OF_MEASUREMENT, STATE_UNKNOWN,
     CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION,
@@ -48,13 +49,13 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
         config = PLATFORM_SCHEMA(discovery_info)
     url = config.get(CONF_URL)
     device = NipcaCameraDevice.from_url(hass, config, url)
-    async_add_devices([NipcaSensor(hass, device)])
+    async_add_devices([NipcaMotionSensor(hass, device)])
 
 
-class NipcaSensor(Entity):
-    """Representation of a SNMP sensor."""
+class NipcaMotionSensor(BinarySensorDevice):
+    """Representation of a Camera Motion Sensor."""
 
-    ICON = 'mdi:run-fast'
+    DEVICE_CLASS = 'motion'
 
     def __init__(self, hass, device):
         """Initialize the sensor."""
@@ -84,11 +85,17 @@ class NipcaSensor(Entity):
         return self._name
 
     @property
+    def is_on(self):
+        """Return true if the binary sensor is on."""
+        return self._state == STATE_ON
+
+    @property
     def state(self):
-        """Return the state of the sensor."""
-        if not self.device.motion_detection_enabled:
-            return 'disabled'
-        return self._state
+        """Return the state of the binary sensor."""
+        if self.device.motion_detection_enabled:
+            return self._state
+        else:
+            return STATE_UNKNOWN
 
     @property
     def device_state_attributes(self):
@@ -97,9 +104,9 @@ class NipcaSensor(Entity):
         return attributes
 
     @property
-    def icon(self):
-        """Return the icon of the device."""
-        return self.ICON
+    def device_class(self):
+        """Return the class of this device, from component DEVICE_CLASSES."""
+        return self.DEVICE_CLASS
 
     @asyncio.coroutine
     def async_update(self):
@@ -141,11 +148,12 @@ class NipcaSensor(Entity):
             line = yield from response.content.readline()
             line = line.decode().strip()
             if line:
-                #_LOGGER.info('nipca %s', line)
+                _LOGGER.debug('nipca %s, %s', line, self._state)
                 if '=' in line:
                     k, v = line.split('=', 1)
                     self._events[k] = v
                     # TODO: audio_detected=on
                     if k == 'md1' and self._state != v:  # TODO: fix
+                        _LOGGER.debug('update %s, %s', self._state, v)
                         self._state = v
                         yield

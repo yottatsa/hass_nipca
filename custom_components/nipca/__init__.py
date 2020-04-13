@@ -1,9 +1,3 @@
-"""
-Will open a port in your router for Home Assistant and provide statistics.
-
-For more details about this component, please refer to the documentation at
-https://home-assistant.io/components/upnp/
-"""
 from ipaddress import ip_address
 import logging
 import asyncio
@@ -22,8 +16,6 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import discovery
 from homeassistant.util import get_local_ip
 
-
-DEPENDENCIES = ['upnp', 'api']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +56,7 @@ async def async_setup(hass, config):
             )
             hass.async_add_job(
                 discovery.async_load_platform(
-                    hass, 'sensor', DOMAIN, device.motion_device_info, config
+                    hass, 'binary_sensor', DOMAIN, device.motion_device_info, config
                 )
             )
         except UpnpSoapError as error:
@@ -78,7 +70,10 @@ class NipcaCameraDevice(object):
     """Get the latest sensor data."""
     COMMON_INFO = '{}/common/info.cgi'
     STREAM_INFO = '{}/config/stream_info.cgi'
-    MOTION_INFO = '{}/config/motion.cgi'  # D-Link has only this one working
+    MOTION_INFO = [
+        '{}/config/motion.cgi',
+        '{}/motion.cgi',  # Some D-Links has only this one working
+    ]
     STILL_IMAGE = '{}/image/jpeg.cgi'
     NOTIFY_STREAM = '{}/config/notify_stream.cgi'
 
@@ -102,6 +97,7 @@ class NipcaCameraDevice(object):
         self.hass = hass
         self.conf = conf
         self.url = url
+        self.motion_info_url = None
 
         self._authentication = self.conf.get(CONF_AUTHENTICATION)
         self._username = self.conf.get(CONF_USERNAME)
@@ -135,8 +131,11 @@ class NipcaCameraDevice(object):
     @property
     def motion_detection_enabled(self):
         """Return the camera motion detection status."""
-        return self._attributes.get('enable') == 'yes'
-        #return self._attributes.get('motiondetectionenable') == '1'
+        if self._attributes.get('enable') == 'yes':
+            return True
+        if self._attributes.get('motiondetectionenable') == '1':
+            return True
+        return False
 
     @property
     def camera_device_info(self):
@@ -159,7 +158,7 @@ class NipcaCameraDevice(object):
             {
                 'platform': DOMAIN,
                 'url': self.url,
-                CONF_NAME: '{} motion sensor'.format(self.name),
+                CONF_NAME: '{} Motion Sensor'.format(self.name),
             }
         )
         return device_info
@@ -167,10 +166,21 @@ class NipcaCameraDevice(object):
     def update_info(self):
         self._attributes.update(self._nipca(self.COMMON_INFO))
         self._attributes.update(self._nipca(self.STREAM_INFO))
-        self._attributes.update(self._nipca(self.MOTION_INFO))
+        if not self.motion_info_url:
+            for url in self.MOTION_INFO:
+                attrs = self._nipca(url)
+                if attrs:
+                    self._attributes.update(attrs)
+                    self.motion_info_url = url
+                    break
+            else:
+                self.motion_info_url = 'disabled'
+        elif self.motion_info_url != 'disabled':
+            self._attributes.update(self._nipca(self.motion_info_url))
 
     def _nipca(self, suffix):
         url = self._build_url(suffix)
+        result = {}
         try:
             if self._auth:
                 _LOGGER.debug("con auth" + url)
@@ -178,11 +188,8 @@ class NipcaCameraDevice(object):
             else:
                 _LOGGER.debug("sin auth" + url)
                 req = requests.get(url, timeout=10)
-            result = {}
         except ConnectionError as error:
             _LOGGER.error("ERROR camera conexion: " + error)
-        #except ConnectionError as error:
-        #    _LOGGER.error("ERROR camera conexion: " + error)
         for l in req.iter_lines():
             if l:
                 if '=' in l.decode().strip():
