@@ -25,6 +25,10 @@ nipca:
 * Stream and attributes (name, motion detection status) discovery
 * Motion and sound detection
 
+## TBD
+* Integration flow
+* [`dlinkdcs` library](https://github.com/scross01/dlink-dcs-python-lib)
+
 [NIPCA]: http://gurau-audibert.hd.free.fr/josdblog/wp-content/uploads/2013/09/CGI_2121.pdf
 [custom_components/nipca]: https://github.com/yottatsa/hass_nipca/tree/master/custom_components/nipca
 [claimed1]: http://content.etilize.com/user-manual/1021943810.pdf
