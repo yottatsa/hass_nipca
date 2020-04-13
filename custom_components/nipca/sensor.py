@@ -108,7 +108,7 @@ class NipcaSensor(Entity):
             self.client = self._tail()
         if self.client:
             try:
-                with async_timeout.timeout(5, loop=self.hass.loop):
+                with async_timeout.timeout(10, loop=self.hass.loop):
                     yield from next(self.client)
 
             except TypeError:
@@ -120,9 +120,13 @@ class NipcaSensor(Entity):
             except aiohttp.ClientError as err:
                 _LOGGER.error("Error getting new camera image: %s", err)
 
+            except RuntimeError:
+                #_LOGGER.info("RuntimeError: nipca %s", err)
+                pass
+
             except StopIteration:
                 self.client = None
-                self._state = None
+                # self._state = None
         if not self.device.motion_detection_enabled:
             self.client = None
         return True
@@ -137,10 +141,11 @@ class NipcaSensor(Entity):
             line = yield from response.content.readline()
             line = line.decode().strip()
             if line:
-                _LOGGER.error('nipca %s', line)
+                #_LOGGER.info('nipca %s', line)
                 if '=' in line:
                     k, v = line.split('=', 1)
                     self._events[k] = v
+                    # TODO: audio_detected=on
                     if k == 'md1' and self._state != v:  # TODO: fix
                         self._state = v
                         yield

@@ -16,7 +16,7 @@ import voluptuous as vol
 from homeassistant.const import (
     CONF_NAME, CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION,
     HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION)
-from homeassistant.components.camera.mjpeg import CONF_MJPEG_URL, CONF_STILL_IMAGE_URL
+from homeassistant.components.mjpeg.camera import (CONF_MJPEG_URL, CONF_STILL_IMAGE_URL)
 from homeassistant.const import (EVENT_HOMEASSISTANT_STOP)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import discovery
@@ -78,7 +78,7 @@ class NipcaCameraDevice(object):
     """Get the latest sensor data."""
     COMMON_INFO = '{}/common/info.cgi'
     STREAM_INFO = '{}/config/stream_info.cgi'
-    MOTION_INFO = '{}/motion.cgi'  # D-Link has only this one working
+    MOTION_INFO = '{}/config/motion.cgi'  # D-Link has only this one working
     STILL_IMAGE = '{}/image/jpeg.cgi'
     NOTIFY_STREAM = '{}/config/notify_stream.cgi'
 
@@ -135,7 +135,8 @@ class NipcaCameraDevice(object):
     @property
     def motion_detection_enabled(self):
         """Return the camera motion detection status."""
-        return self._attributes.get('motiondetectionenable') == '1'
+        return self._attributes.get('enable') == 'yes'
+        #return self._attributes.get('motiondetectionenable') == '1'
 
     @property
     def camera_device_info(self):
@@ -169,16 +170,27 @@ class NipcaCameraDevice(object):
         self._attributes.update(self._nipca(self.MOTION_INFO))
 
     def _nipca(self, suffix):
-        """Return a still image response from the camera."""
         url = self._build_url(suffix)
-        if self._auth:
-            req = requests.get(url, auth=self._auth, timeout=10)
-        else:
-            req = requests.get(url, timeout=10)
-        result = {}
+        try:
+            if self._auth:
+                _LOGGER.debug("con auth" + url)
+                req = requests.get(url, auth=self._auth, timeout=10)
+            else:
+                _LOGGER.debug("sin auth" + url)
+                req = requests.get(url, timeout=10)
+            result = {}
+        except ConnectionError as error:
+            _LOGGER.error("ERROR camera conexion: " + error)
+        #except ConnectionError as error:
+        #    _LOGGER.error("ERROR camera conexion: " + error)
         for l in req.iter_lines():
-            k, v = l.decode().strip().split('=', 1)
-            result[k.lower()] = v
+            if l:
+                if '=' in l.decode().strip():
+                    _LOGGER.debug(l.decode().strip())
+                    k, v = l.decode().strip().split('=', 1)
+                    result[k.lower()] = v
+                else:
+                    _LOGGER.error("Nipca Can not read line in " + url)
         return result
 
     def _build_url(self, suffix):

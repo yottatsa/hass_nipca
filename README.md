@@ -15,6 +15,7 @@ Discover and set up [NIPCA]-compatible cameras.
 * D-Link DCS-930LB1 `version=2.15` `build=6` *tested*
 * TRENDnet TV-IP672W, TV-IP672WI The Megapixel Wireless N (Day/Night) PTZ Internet Camera *[claimed1]*
 * D-Link DCS-6513 *[claimed2]* and lot mote *[claimed3]*
+* [D-Link DCS-P6000LH](implemented1) (alternative location for motion config)
 
 ## Supported features
 
@@ -27,3 +28,4 @@ Discover and set up [NIPCA]-compatible cameras.
 [claimed1]: http://content.etilize.com/user-manual/1021943810.pdf
 [claimed2]: https://cpcam.jp/security/product/ip/nuuo_camera-list/nsv2u_list.pdf
 [claimed3]: http://manual-guide.com/manu/26086/index.html
+[implemented1]: https://github.com/dave-code-ruiz/nipca/blob/b63da25c9dbe48a0f6ea2dd450822e28cec7d666/README.md

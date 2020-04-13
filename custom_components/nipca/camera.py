@@ -2,7 +2,7 @@
 Support for IP Cameras.
 
 For more details about this platform, please refer to the documentation at
-https://home-assistant.io/components/camera.mjpeg/
+https://home-assistant.io/components/.mjpeg/
 """
 import asyncio
 import logging
@@ -22,9 +22,9 @@ from homeassistant.helpers.aiohttp_client import (
     async_get_clientsession, async_aiohttp_proxy_web)
 from homeassistant.helpers import config_validation as cv
 
-from homeassistant.components.camera.mjpeg import MjpegCamera, CONF_MJPEG_URL, CONF_STILL_IMAGE_URL, PLATFORM_SCHEMA
+from homeassistant.components.mjpeg.camera import PLATFORM_SCHEMA, MjpegCamera
 
-from ..nipca import NipcaCameraDevice
+from custom_components.nipca import NipcaCameraDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class NipcaCamera(MjpegCamera):
     def __init__(self, hass, device):
         """Initialize a MJPEG camera from NIPCA."""
         self.device = device
-        super().__init__(hass, self.device.camera_device_info)
+        super().__init__(self.device.camera_device_info)
 
     @property
     def brand(self):
