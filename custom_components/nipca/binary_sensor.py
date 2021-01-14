@@ -16,7 +16,12 @@ import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import STATE_ON
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.components.binary_sensor import BinarySensorDevice
+
+try:
+    from homeassistant.components.binary_sensor import BinarySensorEntity
+except:
+    from homeassistant.components.binary_sensor import BinarySensorDevice as BinarySensorEntity
+
 from homeassistant.const import (
     CONF_HOST, CONF_NAME, CONF_UNIT_OF_MEASUREMENT, STATE_UNKNOWN,
     CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION,
@@ -52,7 +57,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     async_add_devices([NipcaMotionSensor(hass, device)])
 
 
-class NipcaMotionSensor(BinarySensorDevice):
+class NipcaMotionSensor(BinarySensorEntity):
     """Representation of a Camera Motion Sensor."""
 
     DEVICE_CLASS = 'motion'

@@ -46,9 +46,18 @@ async def async_setup(hass, config):
         try:
             device = await resp.get_device()
             device_info = device['root']['device']
-            device = NipcaCameraDevice.from_device_info(
-                hass, config, device_info
-            )
+            #device = NipcaCameraDevice.from_device_info(
+            #    hass, config, device_info
+            #)
+            
+            url = device_info.get('presentationURL')
+            data_name = DATA_NIPCA.format(url)
+            device = hass.data.get(data_name)
+            if not device:
+                device = NipcaCameraDevice(hass, config, url)
+                await hass.async_add_job(device.update_info)
+                hass.data[data_name] = device
+
             hass.async_add_job(
                 discovery.async_load_platform(
                     hass, 'camera', DOMAIN, device.camera_device_info, config
