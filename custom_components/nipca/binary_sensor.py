@@ -115,7 +115,14 @@ class NipcaMotionSensor(BinarySensorEntity):
 
     @asyncio.coroutine
     def async_update(self):
-        yield from self.hass.async_add_job(self.device.update_info)
+        try:
+            yield from self.hass.async_add_job(self.device.update_info)
+        except Exception as e:
+            _LOGGER.debug('nipca %s', e)
+            self.client = None
+            self._state = None
+            return True
+            
         if self.device.motion_detection_enabled and not self.client:
             self.client = self._tail()
         if self.client:
