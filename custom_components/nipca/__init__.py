@@ -1,7 +1,8 @@
 from ipaddress import ip_address
 import logging
 import asyncio
-
+import async_timeout
+import aiohttp
 import requests
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
@@ -107,18 +108,26 @@ class NipcaCameraDevice(object):
         self.conf = conf
         self.url = url
         self.motion_info_url = None
-
+        self.client = None
+        
         self._authentication = self.conf.get(CONF_AUTHENTICATION)
         self._username = self.conf.get(CONF_USERNAME)
         self._password = self.conf.get(CONF_PASSWORD)
+        
         if self._username and self._password:
             if self._authentication == HTTP_DIGEST_AUTHENTICATION:
-                self._auth = HTTPDigestAuth(self._username, self._password)
+                self.http_auth = HTTPDigestAuth(self._username, self._password)
+                self.aiohttp_auth = aiohttp.DigestAuth(self._username, 
+                    password=self._password)
             else:
-                self._auth = HTTPBasicAuth(self._username, self._password)
+                self.http_auth = HTTPBasicAuth(self._username, self._password)
+                self.aiohttp_auth = aiohttp.BasicAuth(self._username, 
+                    password=self._password)
         else:
-            self._auth = None
-
+            self.http_auth = None
+            self.aiohttp_auth = None
+        
+        self._events = {}
         self._attributes = {}
 
     @property
@@ -191,14 +200,13 @@ class NipcaCameraDevice(object):
         url = self._build_url(suffix)
         result = {}
         try:
-            if self._auth:
-                _LOGGER.debug("con auth" + url)
-                req = requests.get(url, auth=self._auth, timeout=10)
+            if self.http_auth:
+                req = requests.get(url, auth=self.http_auth, timeout=10)
             else:
-                _LOGGER.debug("sin auth" + url)
                 req = requests.get(url, timeout=10)
-        except ConnectionError as error:
-            _LOGGER.error("ERROR camera conexion: " + error)
+        except ConnectionError as err:
+            _LOGGER.error("Nipca ConnectionError: %s", err)
+            
         for l in req.iter_lines():
             if l:
                 if '=' in l.decode().strip():
@@ -206,8 +214,60 @@ class NipcaCameraDevice(object):
                     k, v = l.decode().strip().split('=', 1)
                     result[k.lower()] = v
                 else:
-                    _LOGGER.error("Nipca Can not read line in " + url)
+                    _LOGGER.debug("Nipca can't read line in " + url)
         return result
 
     def _build_url(self, suffix):
         return suffix.format(self.url)
+
+    async def update_motion_sensors(self):
+        if self.motion_detection_enabled and not self.client:
+            self.client = self._notify_listener()
+            
+        if self.client:
+            try:
+                async with async_timeout.timeout(10, loop=self.hass.loop):
+                    await self.client.__anext__()
+
+            except TypeError as err:
+                _LOGGER.warning("Nipca TypeError: %s", err)
+
+            except asyncio.TimeoutError:
+                _LOGGER.error("Nipca TimeoutError: Timeout getting status info")
+                self.client = None
+
+            except aiohttp.ClientError as err:
+                _LOGGER.error("Nipca ClientError: %s", err)
+                self.client = None
+
+            except RuntimeError as err:
+                _LOGGER.warning("Nipca RuntimeError: %s", err)
+
+            except StopAsyncIteration:
+                _LOGGER.warning("Nipca StopAsyncIteration: Possibly server error")
+                self.client = None
+            
+        return self._events
+
+    async def _notify_listener(self):
+        websession = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        response = await websession.get(self.notify_stream_url,
+            auth=self.aiohttp_auth)
+            
+        cleaned_buffer_count = 0
+        while cleaned_buffer_count < 5:
+            if len(response.content._buffer) == 0:
+                cleaned_buffer_count += 1
+            else:
+                cleaned_buffer_count = 0
+                
+            while len(response.content._buffer) > 0:
+                line = await response.content.readline()
+                line = line.decode().strip()
+                if line:
+                    _LOGGER.info('Nipca status: %s', line)
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        self._events[k] = v
+            yield
+    
