@@ -14,6 +14,9 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.helpers.entity import async_generate_entity_id
+
+from homeassistant.components.binary_sensor import ENTITY_ID_FORMAT
 
 try:
     from homeassistant.components.binary_sensor import BinarySensorEntity
@@ -60,6 +63,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     await coordinator.async_refresh()
 
+    device.coordinator = coordinator
+
     sensors = ["md1"]
 
     if "mic" in device._attributes and device._attributes["mic"]=="yes":
@@ -88,11 +93,29 @@ class NipcaMotionSensor(CoordinatorEntity, BinarySensorEntity):
         self._device = device
         self._name = name
         self._coordinator = coordinator
+        
+        self.entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, 
+            '_'.join(
+                [self._device._attributes['macaddr'].replace('.','_'), 
+                self._name, 
+                'sensor']
+                ), 
+            hass=hass
+            )
+
+    @property
+    def unique_id(self):
+        """Return a unique_id for this entity."""
+        return '_'.join(
+            [self._device._attributes['macaddr'].replace('.','_'), 
+            self._name, 
+            'sensor']
+            )
 
     @property
     def name(self):
         """Return the name of the sensor."""
-        return '_'.join([self._device._attributes['name'], self._name, 'sensor'])
+        return ' '.join([self._device._attributes['name'], self._name, 'sensor'])
 
     @property
     def is_on(self):

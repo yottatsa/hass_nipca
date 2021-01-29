@@ -15,8 +15,8 @@ from homeassistant.components.mjpeg.camera import (CONF_MJPEG_URL, CONF_STILL_IM
 from homeassistant.const import (EVENT_HOMEASSISTANT_STOP)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import discovery
+from homeassistant.helpers.event import async_call_later
 from homeassistant.util import get_local_ip
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,6 +109,7 @@ class NipcaCameraDevice(object):
         self.url = url
         self.motion_info_url = None
         self.client = None
+        self.coordinator = None
         
         self._authentication = self.conf.get(CONF_AUTHENTICATION)
         self._username = self.conf.get(CONF_USERNAME)
@@ -220,6 +221,15 @@ class NipcaCameraDevice(object):
     def _build_url(self, suffix):
         return suffix.format(self.url)
 
+    def manual_update_sensors(self, data):
+        for key in data.keys():
+            self._events[key] = data[key]
+            
+        self.coordinator.data = self._events
+            
+        for update_callback in self.coordinator._listeners:
+            update_callback()
+
     async def update_motion_sensors(self):
         if self.motion_detection_enabled and not self.client:
             self.client = self._notify_listener()
@@ -228,7 +238,9 @@ class NipcaCameraDevice(object):
             try:
                 async with async_timeout.timeout(10, loop=self.hass.loop):
                     await self.client.__anext__()
-
+                    #async_call_later(self.hass,1,
+                    #    lambda _: _LOGGER.warning("Nipca async_call_later"))
+                        
             except TypeError as err:
                 _LOGGER.warning("Nipca TypeError: %s", err)
 
@@ -268,6 +280,9 @@ class NipcaCameraDevice(object):
                     _LOGGER.info('Nipca status: %s', line)
                     if '=' in line:
                         k, v = line.split('=', 1)
-                        self._events[k] = v
+                        if k in ('md1','pir','audio_detected'):
+                            self.manual_update_sensors({k:v})
+                        else:
+                            self._events[k] = v
             yield
     
