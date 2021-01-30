@@ -10,7 +10,7 @@ import voluptuous as vol
 
 from homeassistant.const import (
     CONF_NAME, CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION,
-    HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION)
+    HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION, CONF_SCAN_INTERVAL)
 from homeassistant.components.mjpeg.camera import (CONF_MJPEG_URL, CONF_STILL_IMAGE_URL)
 from homeassistant.const import (EVENT_HOMEASSISTANT_STOP)
 from homeassistant.helpers import config_validation as cv
@@ -25,12 +25,15 @@ DATA_NIPCA = 'nipca.{}'
 
 BASIC_DEVICE = 'urn:schemas-upnp-org:device:Basic:1.0'
 
+SCAN_INTERVAL = 10
+
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Optional(CONF_AUTHENTICATION, default=HTTP_BASIC_AUTHENTICATION):
             vol.In([HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION]),
         vol.Optional(CONF_PASSWORD): cv.string,
         vol.Optional(CONF_USERNAME): cv.string,
+        vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.positive_int,
     }),
 }, extra=vol.ALLOW_EXTRA)
 
@@ -45,20 +48,13 @@ async def async_setup(hass, config):
     resps = await pyupnp_async.msearch(search_target=BASIC_DEVICE)
     for resp in resps:
         try:
-            device = await resp.get_device()
-            device_info = device['root']['device']
-            #device = NipcaCameraDevice.from_device_info(
-            #    hass, config, device_info
-            #)
-            
-            url = device_info.get('presentationURL')
-            data_name = DATA_NIPCA.format(url)
-            device = hass.data.get(data_name)
-            if not device:
-                device = NipcaCameraDevice(hass, config, url)
-                await hass.async_add_job(device.update_info)
-                hass.data[data_name] = device
+            camera = await resp.get_device()
+            camera_info = camera['root']['device']
+            url = camera_info.get('presentationURL')
 
+            device = await hass.async_add_executor_job(
+                NipcaCameraDevice.from_url,hass, config, url)
+            
             hass.async_add_job(
                 discovery.async_load_platform(
                     hass, 'camera', DOMAIN, device.camera_device_info, config
@@ -66,7 +62,8 @@ async def async_setup(hass, config):
             )
             hass.async_add_job(
                 discovery.async_load_platform(
-                    hass, 'binary_sensor', DOMAIN, device.motion_device_info, config
+                    hass, 'binary_sensor', DOMAIN, device.motion_device_info,
+                    config
                 )
             )
         except UpnpSoapError as error:
@@ -238,9 +235,7 @@ class NipcaCameraDevice(object):
             try:
                 async with async_timeout.timeout(10, loop=self.hass.loop):
                     await self.client.__anext__()
-                    #async_call_later(self.hass,1,
-                    #    lambda _: _LOGGER.warning("Nipca async_call_later"))
-                        
+
             except TypeError as err:
                 _LOGGER.warning("Nipca TypeError: %s", err)
 
@@ -256,7 +251,7 @@ class NipcaCameraDevice(object):
                 _LOGGER.warning("Nipca RuntimeError: %s", err)
 
             except StopAsyncIteration:
-                _LOGGER.warning("Nipca StopAsyncIteration: Possibly server error")
+                _LOGGER.warning("Nipca StopAsyncIteration: Possibly camera error")
                 self.client = None
             
         return self._events
@@ -277,10 +272,10 @@ class NipcaCameraDevice(object):
                 line = await response.content.readline()
                 line = line.decode().strip()
                 if line:
-                    _LOGGER.info('Nipca status: %s', line)
+                    _LOGGER.debug('Nipca status: %s', line)
                     if '=' in line:
                         k, v = line.split('=', 1)
-                        if k in ('md1','pir','audio_detected'):
+                        if v in ('yes','no'):
                             self.manual_update_sensors({k:v})
                         else:
                             self._events[k] = v

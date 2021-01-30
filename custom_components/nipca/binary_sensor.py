@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import async_timeout
 import voluptuous as vol
 
 from datetime import timedelta
@@ -12,7 +11,6 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
-    UpdateFailed,
 )
 from homeassistant.helpers.entity import async_generate_entity_id
 
@@ -25,13 +23,13 @@ except:
 
 from homeassistant.const import (
     CONF_HOST, CONF_NAME, CONF_UNIT_OF_MEASUREMENT, STATE_UNKNOWN,
-    CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION,
+    CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION, CONF_SCAN_INTERVAL,
     HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION, CONF_URL)
 from ..nipca import NipcaCameraDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(seconds=10)
+SCAN_INTERVAL = 10
 
 DEFAULT_NAME = 'NIPCA Camera'
 
@@ -42,28 +40,29 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_PASSWORD): cv.string,
     vol.Optional(CONF_USERNAME): cv.string,
     vol.Required(CONF_URL): cv.url,
-    vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
     vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
-})
+    vol.Optional(CONF_SCAN_INTERVAL, default=SCAN_INTERVAL): cv.positive_int,
+}, extra=vol.ALLOW_EXTRA)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up a NIPCA Camera Sensors."""
     if discovery_info:
         config = PLATFORM_SCHEMA(discovery_info)
     url = config.get(CONF_URL)
-    device = NipcaCameraDevice.from_url(hass, config, url)
+    device = await hass.async_add_executor_job(
+        NipcaCameraDevice.from_url,hass, config, url)
     
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
         name="motion_sensor",
         update_method=device.update_motion_sensors,
-        update_interval=SCAN_INTERVAL,
+        update_interval=timedelta(seconds=config.get(CONF_SCAN_INTERVAL)),
     )
 
-    await coordinator.async_refresh()
-
     device.coordinator = coordinator
+
+    await coordinator.async_refresh()
 
     sensors = ["md1"]
 
@@ -72,6 +71,24 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         
     if "pir" in device._attributes and device._attributes["pir"]=="yes":
         sensors.append("pir")
+        
+    if "led" in device._attributes and device._attributes["led"]=="yes":
+        sensors.append("led")
+        
+    if "ir" in device._attributes and device._attributes["ir"]=="yes":
+        sensors.append("irled")
+        
+    if "inputs" in device._attributes:
+        num_inputs = int(device._attributes["inputs"])
+        if num_inputs > 0:
+            for input in range(1,num_inputs+1):
+                sensors.append(f"input{input}")
+        
+    if "outputs" in device._attributes:
+        num_outputs = int(device._attributes["outputs"])
+        if num_outputs > 0:
+            for output in range(1,num_outputs+1):
+                sensors.append(f"output{output}")
 
     async_add_entities(
         NipcaMotionSensor(

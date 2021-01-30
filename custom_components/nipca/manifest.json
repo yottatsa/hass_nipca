@@ -4,7 +4,7 @@
   "documentation": "https://github.com/yottatsa/hass_nipca",
   "dependencies": ["api"],
   "license": "",
-  "codeowners": ["@fcastroruiz", "@yottatsa"],
+  "codeowners": ["@fcastroruiz", "@yottatsa", "@uncle-yura"],
   "requirements": ["pyupnp_async"]
 }
 
