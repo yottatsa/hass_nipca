@@ -107,7 +107,7 @@ class NipcaCameraDevice(object):
         self.motion_info_url = None
         self.client = None
         self.coordinator = None
-        
+
         self._authentication = self.conf.get(CONF_AUTHENTICATION)
         self._username = self.conf.get(CONF_USERNAME)
         self._password = self.conf.get(CONF_PASSWORD)
@@ -261,8 +261,9 @@ class NipcaCameraDevice(object):
         response = await websession.get(self.notify_stream_url,
             auth=self.aiohttp_auth)
             
+        cycles = 30/self.coordinator.update_interval.total_seconds()
         cleaned_buffer_count = 0
-        while cleaned_buffer_count < 5:
+        while cleaned_buffer_count < cycles:
             if len(response.content._buffer) == 0:
                 cleaned_buffer_count += 1
             else:
