@@ -9,7 +9,28 @@ Discover and set up [NIPCA]-compatible cameras.
 nipca:
   username: <optional username>
   password: <optional password>
+  scan_interval: <optional scan interval in seconds>
 ```
+or
+```
+sensor:
+  - platform: nipca
+    name: <optional camera name>
+    url: <required camera url>
+    username: <optional username>
+    password: <optional password>
+    scan_interval: <optional scan interval in seconds>
+
+camera:
+  - platform: nipca
+    name: <optional camera name>
+    url: <required camera url>
+    username: <optional username>
+    password: <optional password>
+    mjpeg_url: <optional mjpeg_url>
+    still_image_url: <optional still_image_url>
+```
+
 
 ## Supported devices
 
@@ -17,13 +38,15 @@ nipca:
 * TRENDnet TV-IP672W, TV-IP672WI The Megapixel Wireless N (Day/Night) PTZ Internet Camera *[claimed1]*
 * D-Link DCS-6513 *[claimed2]* and lot mote *[claimed3]*
 * D-Link DCS-P6000LH *[implemented1]* (alternative location for motion config)
+* D-Link DCS-2132LB `Firmware Version 2.13.03, Hardware Version B` *tested*
 
 ## Supported features
 
 * UPNP discovery
 * Auth
 * Stream and attributes (name, motion detection status) discovery
-* Motion and sound detection
+* Motion, pir and sound detection
+* Led, inputs ans outputs status
 
 ## TBD
 * Integration flow
