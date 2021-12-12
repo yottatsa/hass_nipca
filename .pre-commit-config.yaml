@@ -1,0 +1,43 @@
+﻿# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+    - id: trailing-whitespace
+    - id: end-of-file-fixer
+    - id: check-yaml
+    - id: check-added-large-files
+    - id: check-merge-conflict
+    - id: debug-statements
+
+-   repo: local
+    hooks:
+    - id: black
+      name: black
+      entry: black
+      language: system
+      types: [python]
+      args: [--line-length=200, --target-version=py39]
+
+    - id: autoflake
+      name: autoflake
+      entry: autoflake
+      language: system
+      types: [python]
+      args: [--in-place, --remove-all-unused-imports, --remove-duplicate-keys]
+
+    - id: pyupgrade
+      name: pyupgrade
+      entry: pyupgrade
+      language: system
+      types: [python]
+      args: [--py39-plus]
+
+    - id: reorder-python-imports
+      name: reorder-python-imports
+      entry: reorder-python-imports
+      language: system
+      types: [python]
+      args: [--py39-plus]
+    

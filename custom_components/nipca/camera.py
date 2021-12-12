@@ -6,35 +6,26 @@ https://home-assistant.io/components/.mjpeg/
 """
 import asyncio
 import logging
-from contextlib import closing
 
-import aiohttp
-import async_timeout
-import requests
-from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 import voluptuous as vol
-
-from homeassistant.const import (
-    CONF_NAME, CONF_USERNAME, CONF_PASSWORD, CONF_AUTHENTICATION,
-    HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION, CONF_URL)
-from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.aiohttp_client import (
-    async_get_clientsession, async_aiohttp_proxy_web)
+from homeassistant.components.mjpeg.camera import MjpegCamera
+from homeassistant.components.mjpeg.camera import PLATFORM_SCHEMA
+from homeassistant.const import CONF_URL
 from homeassistant.helpers import config_validation as cv
-
-from homeassistant.components.mjpeg.camera import PLATFORM_SCHEMA, MjpegCamera
 
 from custom_components.nipca import NipcaCameraDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-CONTENT_TYPE_HEADER = 'Content-Type'
+CONTENT_TYPE_HEADER = "Content-Type"
 
-DEFAULT_NAME = 'NIPCA Camera'
+DEFAULT_NAME = "NIPCA Camera"
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_URL): cv.url,
-})
+PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+    {
+        vol.Required(CONF_URL): cv.url,
+    }
+)
 
 
 @asyncio.coroutine
@@ -61,12 +52,12 @@ class NipcaCamera(MjpegCamera):
     @property
     def brand(self):
         """Return the camera brand."""
-        return self.device._attributes['brand']
+        return self.device._attributes["brand"]
 
     @property
     def model(self):
         """Return the camera model."""
-        return self.device._attributes['model']
+        return self.device._attributes["model"]
 
     @property
     def motion_detection_enabled(self):

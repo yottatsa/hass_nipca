@@ -32,9 +32,9 @@ I accidentally found that `/motion.cgi` contains needed info, even in another fo
     mic=on
     md1=off
     audio_detected=off
-    
+
     keep_alive
-    
+
     md1=on
 
 # Implementation
