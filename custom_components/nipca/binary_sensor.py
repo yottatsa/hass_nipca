@@ -140,7 +140,7 @@ class NipcaMotionSensor(CoordinatorEntity, BinarySensorEntity):
             return STATE_UNKNOWN
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the attributes of the binary sensor."""
         attr = self._device._events.copy()
         return {k: v for k, v in attr.items() if k.startswith(self._name[:2])}
