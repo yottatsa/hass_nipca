@@ -1,10 +1,12 @@
-import asyncio
 import logging
 
 import aiohttp
-import async_timeout
 import requests
 import voluptuous as vol
+import xmltodict
+from aiohttp import ClientError
+from aiohttp import ClientTimeout
+from async_upnp_client.profiles.profile import UpnpProfileDevice
 from homeassistant.components.mjpeg.camera import CONF_MJPEG_URL
 from homeassistant.components.mjpeg.camera import CONF_STILL_IMAGE_URL
 from homeassistant.const import CONF_AUTHENTICATION
@@ -16,8 +18,6 @@ from homeassistant.const import HTTP_BASIC_AUTHENTICATION
 from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import discovery
-from pyupnp_async import msearch
-from pyupnp_async.error import UpnpSoapError
 from requests.auth import HTTPBasicAuth
 from requests.auth import HTTPDigestAuth
 
@@ -26,9 +26,8 @@ _LOGGER = logging.getLogger(__name__)
 DOMAIN = "nipca"
 DATA_NIPCA = "nipca.{}"
 
-BASIC_DEVICE = "urn:schemas-upnp-org:device:Basic:1.0"
-
 SCAN_INTERVAL = 10
+ASYNC_TIMEOUT = 10
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -45,23 +44,32 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
+class DLinkUPNPProfile(UpnpProfileDevice):
+    DEVICE_TYPES = [
+        "urn:schemas-upnp-org:device:Basic:1",
+    ]
+
+
 async def async_setup(hass, config):
     """Register a port mapping for Home Assistant via UPnP."""
     config = config[DOMAIN]
 
-    resps = await msearch(search_target=BASIC_DEVICE)
+    resps = await DLinkUPNPProfile.async_discover()
     for resp in resps:
         try:
-            camera = await resp.get_device()
+            websession = hass.helpers.aiohttp_client.async_get_clientsession()
+            response = await websession.get(url=resp["LOCATION"], timeout=ClientTimeout(total=ASYNC_TIMEOUT))
+
+            camera = xmltodict.parse(await response.text())
+
             camera_info = camera["root"]["device"]
             url = camera_info.get("presentationURL")
 
             device = await hass.async_add_executor_job(NipcaCameraDevice.from_url, hass, config, url)
 
             hass.async_add_job(discovery.async_load_platform(hass, "camera", DOMAIN, device.camera_device_info, config))
+
             hass.async_add_job(discovery.async_load_platform(hass, "binary_sensor", DOMAIN, device.motion_device_info, config))
-        except UpnpSoapError as error:
-            _LOGGER.error(error)
         except requests.exceptions.MissingSchema as error:
             _LOGGER.error(error)
     return True
@@ -78,6 +86,8 @@ class NipcaCameraDevice:
     ]
     STILL_IMAGE = "{}/image/jpeg.cgi"
     NOTIFY_STREAM = "{}/config/notify_stream.cgi"
+
+    _timeout = ASYNC_TIMEOUT
 
     @classmethod
     def from_device_info(cls, hass, conf, device_info):
@@ -192,9 +202,9 @@ class NipcaCameraDevice:
         result = {}
         try:
             if self.http_auth:
-                req = requests.get(url, auth=self.http_auth, timeout=10)
+                req = requests.get(url, auth=self.http_auth, timeout=self._timeout)
             else:
-                req = requests.get(url, timeout=10)
+                req = requests.get(url, timeout=self._timeout)
         except ConnectionError as err:
             _LOGGER.error("Nipca ConnectionError: %s", err)
 
@@ -226,17 +236,16 @@ class NipcaCameraDevice:
 
         if self.client:
             try:
-                async with async_timeout.timeout(10, loop=self.hass.loop):
-                    await self.client.__anext__()
+                await self.client.__anext__()
 
             except TypeError as err:
                 _LOGGER.warning("Nipca TypeError: %s", err)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 _LOGGER.error("Nipca TimeoutError: Timeout getting status info")
                 self.client = None
 
-            except aiohttp.ClientError as err:
+            except ClientError as err:
                 _LOGGER.error("Nipca ClientError: %s", err)
                 self.client = None
 
@@ -251,7 +260,7 @@ class NipcaCameraDevice:
 
     async def _notify_listener(self):
         websession = self.hass.helpers.aiohttp_client.async_get_clientsession()
-        response = await websession.get(self.notify_stream_url, auth=self.aiohttp_auth)
+        response = await websession.get(url=self.notify_stream_url, auth=self.aiohttp_auth, timeout=ClientTimeout(total=self._timeout))
 
         cycles = 30 / self.coordinator.update_interval.total_seconds()
         cleaned_buffer_count = 0

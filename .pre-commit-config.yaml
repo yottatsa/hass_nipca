@@ -40,4 +40,3 @@ repos:
       language: system
       types: [python]
       args: [--py39-plus]
-    

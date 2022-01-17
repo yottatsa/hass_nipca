@@ -5,6 +5,6 @@
   "dependencies": ["api"],
   "license": "",
   "codeowners": ["@fcastroruiz", "@yottatsa", "@uncle-yura"],
-  "requirements": ["pyupnp_async"],
+  "requirements": ["async_upnp_client"],
   "version": "1.1"
 }
