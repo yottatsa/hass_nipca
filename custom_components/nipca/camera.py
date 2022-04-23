@@ -8,10 +8,17 @@ import asyncio
 import logging
 
 import voluptuous as vol
-from homeassistant.components.mjpeg.camera import MjpegCamera
-from homeassistant.components.mjpeg.camera import PLATFORM_SCHEMA
-from homeassistant.const import CONF_URL
+from homeassistant.components.mjpeg.camera import MjpegCamera, PLATFORM_SCHEMA
 from homeassistant.helpers import config_validation as cv
+from homeassistant.const import (
+    CONF_NAME,
+    CONF_USERNAME,
+    CONF_PASSWORD,
+    CONF_AUTHENTICATION,
+    CONF_URL,
+    CONF_VERIFY_SSL
+)
+from homeassistant.components.mjpeg.const import CONF_MJPEG_URL, CONF_STILL_IMAGE_URL
 
 from custom_components.nipca import NipcaCameraDevice
 
@@ -47,7 +54,14 @@ class NipcaCamera(MjpegCamera):
     def __init__(self, hass, device):
         """Initialize a MJPEG camera from NIPCA."""
         self.device = device
-        super().__init__(self.device.camera_device_info)
+        device_info = self.device.camera_device_info
+        super().__init__(name=device_info.get(CONF_NAME),
+            authentication=device_info.get(CONF_AUTHENTICATION),
+            username=device_info.get(CONF_USERNAME),
+            password=device_info.get(CONF_PASSWORD),
+            mjpeg_url=device_info.get(CONF_MJPEG_URL),
+            still_image_url=device_info.get(CONF_STILL_IMAGE_URL),
+            verify_ssl=device_info.get(CONF_VERIFY_SSL))
 
     @property
     def brand(self):
